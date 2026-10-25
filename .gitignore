@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.runtime/
+test-results/
+release/
+.env
+.env.*
+!.env.example
+__pycache__/
+*.log
+.DS_Store

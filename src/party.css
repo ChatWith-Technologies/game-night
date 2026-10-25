@@ -1,0 +1,155 @@
+.award-title {
+  display: block;
+  color: var(--lime);
+  font-size: 17px;
+  margin: 7px 0;
+}
+.opinion-note {
+  display: block;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 9px;
+}
+.fact-source {
+  display: inline-block;
+  font-size: 12px;
+  text-decoration: underline;
+  margin-top: 7px;
+  color: var(--lime);
+}
+.party-finished {
+  margin: 32px auto;
+  text-align: center;
+}
+.party-finished > h1 {
+  font-size: clamp(40px, 5vw, 70px);
+  margin: 20px 0 15px;
+}
+.party-finished > .muted {
+  font-size: 15px;
+}
+.award-cabinet {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin: 24px 0;
+  text-align: left;
+}
+.award-person {
+  min-width: 0;
+  border: 1px solid #726642;
+  background: #303025;
+  padding: 20px;
+  border-radius: 10px;
+}
+.award-person-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.award-person-heading > span {
+  font-size: 34px;
+}
+.award-person h3 {
+  margin: 0;
+  font-size: 20px;
+}
+.award-person small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.award-person ul {
+  padding: 0;
+  list-style: none;
+  margin: 14px 0 0;
+}
+.award-person li {
+  margin: 10px 0 0;
+}
+.award-person li b {
+  display: block;
+  font-size: 13px;
+  color: var(--lime);
+}
+.award-person li span {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.award-person p {
+  color: var(--muted);
+  margin: 15px 0 0;
+  font-size: 12px;
+}
+.award-person details {
+  margin-top: 14px;
+  font-size: 11px;
+}
+.phone-leaderboard .award-cabinet {
+  grid-template-columns: 1fr;
+}
+
+.answer-option.vote-leader {
+  background: var(--lime);
+  color: var(--ink);
+  border-color: var(--lime);
+}
+.vote-leader .answer-letter {
+  background: var(--ink);
+  color: var(--lime);
+}
+@media (max-width: 600px) {
+  .award-cabinet {
+    grid-template-columns: 1fr;
+  }
+  .phone-round .answer-option {
+    min-height: 60px;
+    padding: 11px 14px;
+  }
+  .phone-round .answer-option.picked {
+    padding: 10px 13px;
+  }
+}
+@media (min-width: 801px) and (max-height: 850px) {
+  .tv .question-block h1 {
+    font-size: clamp(30px, 3vw, 40px);
+  }
+  .tv .roast-round .answer-option {
+    min-height: 80px;
+    padding: 10px 14px;
+  }
+  .tv .award-title {
+    font-size: 15px;
+    margin: 4px 0;
+  }
+  .tv .opinion-note {
+    margin-top: 5px;
+  }
+  .tv .party-finished {
+    margin: 12px auto;
+  }
+  .tv .party-finished h1 {
+    font-size: 38px;
+    margin: 10px 0;
+  }
+  .tv .award-cabinet {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin: 14px 0;
+  }
+  .tv .award-person {
+    padding: 12px;
+  }
+  .tv .award-person h3 {
+    font-size: 18px;
+  }
+  .tv .award-person-heading > span {
+    font-size: 25px;
+  }
+  .tv .award-person li {
+    margin-top: 7px;
+  }
+}
