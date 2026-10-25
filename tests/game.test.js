@@ -288,7 +288,7 @@ test("host rights, capacity, unique names and lobby boundaries are enforced", ()
     /host/,
   );
   game.start(room.code, room.hostToken);
-  assert.throws(() => game.join(room.code, "Late arrival"), /started/);
+  assert.throws(() => game.join(room.code, "Late arrival"), /eight/);
   assert.throws(
     () => game.remove(room.code, room.hostToken, players[0].id),
     /lobby/,

@@ -8,15 +8,18 @@ A free, open-source party game for 2–8 people in the same home. Run it on one 
 
 ## What you can play
 
-| Mode             | How it works                                                                                                           |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| **House mix**    | Trivia with a party vote every third round. Facts earn points; opinions give awards.                                   |
-| **Trivia night** | Pick your topics. Each correct answer earns 1,000 points.                                                              |
-| **Party awards** | Vote for friends in absurd situations and answer group polls. No right answers, no trivia points. Ties share an award. |
+| Mode                | How it works                                                                                                           |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| **House mix**       | Trivia with a party vote every third round. Facts earn points; opinions give awards.                                   |
+| **Trivia night**    | Pick your topics. Each correct answer earns 1,000 points.                                                              |
+| **Fact or Fiction** | Call each statement true or false. Correct answers earn 1,000 points; every reveal includes a source.                  |
+| **Party awards**    | Vote for friends in absurd situations and answer group polls. No right answers, no trivia points. Ties share an award. |
 
-There are **268 local prompts**: 200 trivia questions, 44 party awards, and 24 group polls. Topics include general knowledge, movies, music, science, sports, Fortnite, history, world knowledge, food, and After Hours. Some party jokes mention bars and hangovers. No drinking is needed.
+There are **328 local prompts**: 200 multiple-choice trivia questions, 60 Fact or Fiction statements, 44 party awards, and 24 group polls. Trivia topics include general knowledge, movies, music, science, sports, Fortnite, history, world knowledge, food, and After Hours. Fact or Fiction uses its own mix of science, sports, history, games, Fortnite, and general knowledge. Some party jokes mention bars and hangovers. No drinking is needed.
 
-Choose 6, 10, or 16 rounds and a 15-, 25-, or 40-second timer. Pause for snacks, show the reveal, or let rounds move on by themselves. New games in the same room prefer prompts you have not seen yet.
+Choose 6, 10, or 16 rounds and a 15-, 25-, or 40-second timer. Pause for snacks, show the reveal, or let rounds move on by themselves. New games in the same room prefer prompts you have not seen yet. A late player can join an open seat and start on the next round. The current round's choices and votes stay fixed.
+
+Need to stop early? The host can choose **End game** and confirm. Earned scores and awards stay; an unfinished question earns no points. In the lobby or results, **Close room** ends that room for all connected screens. Both controls ask for confirmation before they act.
 
 ## Start a game
 
@@ -24,7 +27,7 @@ You need one Windows, macOS, or Linux computer, [Node.js 24](https://nodejs.org/
 
 ### Download and play
 
-1. Download `game-night-0.1.0.zip` from [Releases](https://github.com/ChatWith-Technologies/game-night/releases/latest). Extract the whole ZIP to a folder.
+1. Download `game-night-0.2.0.zip` from [Releases](https://github.com/ChatWith-Technologies/game-night/releases/latest). Extract the whole ZIP to a folder.
 2. On Windows, open **Start Game Night.cmd**. On macOS or Linux, open a terminal in the folder and run `node scripts/play.mjs`.
 3. Keep the game window open. It prints the computer, phone, and TV addresses. Open the computer address in a browser to get started.
 
@@ -74,7 +77,7 @@ Any TV browser that can run the game page may work. If your TV has no suitable b
 | Port is already in use            | Stop the other server, or set `PORT=3220` in `.env`. Use the new printed address. The launcher does not stop other programs.   |
 | Player reloads a page             | Use the same browser and address. Your seat and locked answer should return while the room exists.                             |
 | Host has no answer buttons        | Tap **Join & play** before starting. A TV page is a display, not a player.                                                     |
-| Room is gone                      | Rooms are held in memory. Create a new room after restarting the server or after six hours of inactivity.                      |
+| Room is gone                      | Create a new room after a server restart, host closure, 10 minutes with no connected screens, or six hours of inactivity.      |
 | TV content looks clipped          | Set browser zoom to its normal value and check the TV's picture size or overscan setting. The TV layout is tested at 1280×720. |
 
 Host controls are saved in the browser that made the room. Keep that page open. Use **Open the TV view** for a shared screen, so host controls remain on the host's device.
@@ -95,6 +98,6 @@ Built with Node.js, React, and Socket.IO. See [CONTRIBUTING.md](CONTRIBUTING.md)
 npm run check
 ```
 
-The test suite covers scoring, private answers, host rights, two-to-eight-player limits, timers, reconnects, rematches, and real browser games in Chromium and WebKit. Browser tests emulate mobile screens and a 720p TV; they do not certify every physical phone or TV.
+The tests cover all four modes, scoring, private answers, host rights, two-to-eight-player limits, late joins, timers, reconnects, early endings, room closure, and rematches. Separate browser tests run full games in Chromium and WebKit. Release tests check that unlisted files cannot enter the download. Browser tests emulate mobile screens and a 720p TV; they do not certify every physical phone or TV or replace testing with a screen reader.
 
 MIT licensed. You can use, change, share, and host your own copy under [LICENSE](LICENSE). Fonts and dependencies retain their own licenses; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

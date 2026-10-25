@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { io } from "socket.io-client";
 import "@fontsource/bricolage-grotesque/latin-500.css";
@@ -45,6 +45,15 @@ const modes = {
     tag: "FOR THE KNOW-IT-ALLS",
     color: "peach",
   },
+  truefalse: {
+    name: "Fact or Fiction",
+    short: "Fact or Fiction",
+    icon: "✓",
+    description:
+      "True or false across science, sports, history, games, Fortnite, and general knowledge. Each correct call earns 1,000 points.",
+    tag: "TRUST YOUR INSTINCTS",
+    color: "sky",
+  },
   party: {
     name: "Party awards",
     short: "Group votes",
@@ -55,6 +64,7 @@ const modes = {
     color: "lavender",
   },
 };
+const isScoredMode = (mode) => ["trivia", "truefalse"].includes(mode);
 function read(key) {
   try {
     return localStorage.getItem("gamenight:" + key);
@@ -159,8 +169,8 @@ function Home({ run, busy, connected, config }) {
             answers<span className="orange">.</span>
           </h1>
           <p className="hero-description">
-            Trivia. Party votes. Unofficial awards. Grab a phone and find out
-            whose confidence has been writing checks their brain cannot cash.
+            Trivia. True or false. Party awards. Grab a phone and find out whose
+            confidence has been writing checks their brain cannot cash.
           </p>
           <div className="hero-actions">
             <button
@@ -567,7 +577,7 @@ function Settings({ state, onChange, busy, categories = [] }) {
           </select>
         </label>
       </div>
-      {settings.mode !== "party" && (
+      {["mix", "trivia"].includes(settings.mode) && (
         <div className="category-section">
           <div className="setting-label">
             TRIVIA CATEGORIES · PICK AT LEAST ONE
@@ -735,6 +745,7 @@ function Lobby({
                 Open the TV view <Arrow diagonal />
               </a>
             </div>
+            <RoomAction action="close" {...{ hostAction, busy }} />
           </>
         ) : (
           <div className="waiting-for-host">
@@ -791,6 +802,66 @@ function Timer({ state, offset }) {
   );
 }
 
+function RoomAction({ action, hostAction, busy }) {
+  const [confirming, setConfirming] = useState(false);
+  const trigger = useRef(null);
+  const cancel = useRef(null);
+  const wasOpen = useRef(false);
+  const ending = action === "end";
+  const label = ending ? "End game" : "Close room";
+  useEffect(() => {
+    if (confirming) cancel.current?.focus();
+    else if (wasOpen.current) trigger.current?.focus();
+    wasOpen.current = confirming;
+  }, [confirming]);
+  return (
+    <div className="room-action">
+      {confirming ? (
+        <div
+          className="room-confirmation"
+          role="group"
+          aria-label={label + " confirmation"}
+        >
+          <h3>
+            {ending ? "Finish this game now?" : "Close this room for everyone?"}
+          </h3>
+          <p>
+            {ending
+              ? "Keep the points and awards already earned. Answers still open will not be scored."
+              : "This room code will stop working. Everyone will need a new room to play again."}
+          </p>
+          <div className="confirmation-buttons">
+            <button
+              ref={cancel}
+              className="button outline"
+              disabled={busy}
+              onClick={() => setConfirming(false)}
+            >
+              {ending ? "Keep playing" : "Keep room open"}
+            </button>
+            <button
+              className="button danger"
+              disabled={busy}
+              onClick={() => hostAction(action)}
+            >
+              {label} now
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          ref={trigger}
+          className="button outline room-action-trigger"
+          disabled={busy}
+          onClick={() => setConfirming(true)}
+        >
+          {label}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function HostControls({ state, hostAction, busy }) {
   return (
     <div className="host-controls">
@@ -818,7 +889,7 @@ function HostControls({ state, hostAction, busy }) {
             onClick={() => hostAction("next")}
           >
             {state.roundNumber === state.settings.rounds
-              ? state.settings.mode === "trivia"
+              ? isScoredMode(state.settings.mode)
                 ? "Final scores"
                 : "Awards & scores"
               : "Next round"}{" "}
@@ -832,15 +903,35 @@ function HostControls({ state, hostAction, busy }) {
 
 function Round({ state, role, isHost, answer, hostAction, busy, offset }) {
   const round = state.round;
+  const [announcement, setAnnouncement] = useState("");
+  useEffect(() => {
+    const notice = setTimeout(
+      () =>
+        setAnnouncement(
+          `Round ${state.roundNumber} of ${state.settings.rounds}. ${round.question}`,
+        ),
+      50,
+    );
+    return () => clearTimeout(notice);
+  }, [round.id, round.question, state.roundNumber, state.settings.rounds]);
   const result = round.result;
   const playing = role === "player";
+  const eligible = !playing || state.me?.eligible !== false;
   const selected = state.me?.answer;
   const opinion = ["award", "poll"].includes(round.kind);
   const isAward = round.kind === "award";
-  const points = result && playing ? result.awards[state.me.id] : null;
+  const isTrueFalse = state.settings.mode === "truefalse";
+  const isFinalRound = state.roundNumber === state.settings.rounds;
+  const points =
+    result && playing && eligible ? result.awards[state.me.id] : null;
   const winners = result
     ? round.options.filter((o) => result.winningIds.includes(o.id))
     : [];
+  const awardHeading =
+    winners.length > 2
+      ? winners.length + " friends share the award."
+      : winners.map((o) => o.label).join(" & ") +
+        (winners.length > 1 ? " share the award." : " takes the award.");
   return (
     <section
       className={
@@ -849,6 +940,14 @@ function Round({ state, role, isHost, answer, hostAction, busy, offset }) {
         (round.playerVote ? " roast-round" : "")
       }
     >
+      <div
+        className="sr-only round-announcement"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {announcement}
+      </div>
       <div className="round-top">
         <div className="round-pills">
           <Pill tone={opinion ? "lavender" : "lime"}>
@@ -856,11 +955,9 @@ function Round({ state, role, isHost, answer, hostAction, busy, offset }) {
               ? isAward
                 ? "★ FRIENDSHIP AWARD"
                 : "↗ GROUP VOTE"
-              : round.playerVote
-                ? "↗ ROAST THE ROOM"
-                : opinion
-                  ? "↗ GROUP VOTE"
-                  : "? TRIVIA"}
+              : isTrueFalse
+                ? "✓ FACT OR FICTION"
+                : "? TRIVIA"}
           </Pill>
           <span className="eyebrow">
             ROUND {state.roundNumber} / {state.settings.rounds}
@@ -875,6 +972,13 @@ function Round({ state, role, isHost, answer, hostAction, busy, offset }) {
         </span>
       </div>
       <Timer state={state} offset={offset} />
+      {playing && !eligible && (
+        <div className="late-join-banner" role="status">
+          {isFinalRound
+            ? "You’re in. Watch this final round, then play in the next game."
+            : "You’re in. Your first answer is next round. Watch this round with the group."}
+        </div>
+      )}
       {state.paused && (
         <div className="pause-banner" role="status">
           Snack break. The host has paused the game.
@@ -886,11 +990,7 @@ function Round({ state, role, isHost, answer, hostAction, busy, offset }) {
             ? isAward
               ? "FICTIONAL SITUATION · PICK A FRIEND · NO RIGHT ANSWER"
               : "PICK YOUR FAVORITE · NO RIGHT ANSWER"
-            : round.playerVote
-              ? "PICK A FRIEND · SELF-VOTES ALLOWED"
-              : opinion
-                ? "NO RIGHT ANSWER · NO POINTS"
-                : round.category.toUpperCase() + " · 1,000 POINTS"}
+            : round.category.toUpperCase() + " · 1,000 POINTS"}
         </span>
         <h1>{round.question}</h1>
       </div>
@@ -898,6 +998,13 @@ function Round({ state, role, isHost, answer, hostAction, busy, offset }) {
         {round.options.map((option, i) => {
           const won = result?.winningIds.includes(option.id);
           const picked = selected === option.id;
+          const accessibleResult = result
+            ? opinion
+              ? `${won ? "Top vote. " : ""}${result.counts[option.id]} ${result.counts[option.id] === 1 ? "vote" : "votes"}`
+              : won
+                ? "Correct answer"
+                : "Not correct"
+            : "";
           const classes = [
             "answer-option",
             "option-" + i,
@@ -918,12 +1025,14 @@ function Round({ state, role, isHost, answer, hostAction, busy, offset }) {
               <span className="answer-text">{option.label}</span>
               {result ? (
                 <span className="answer-count">
-                  {opinion
-                    ? result.counts[option.id] +
-                      (result.counts[option.id] === 1 ? " vote" : " votes")
-                    : won
-                      ? "✓"
-                      : ""}
+                  <span className="answer-result">
+                    {opinion
+                      ? result.counts[option.id] +
+                        (result.counts[option.id] === 1 ? " vote" : " votes")
+                      : won
+                        ? "✓ Correct answer"
+                        : ""}
+                  </span>
                   {picked && <small>Your pick</small>}
                 </span>
               ) : picked ? (
@@ -937,11 +1046,18 @@ function Round({ state, role, isHost, answer, hostAction, busy, offset }) {
               className={classes}
               disabled={
                 busy ||
+                !eligible ||
                 state.paused ||
                 state.phase !== "question" ||
                 selected !== null
               }
-              aria-label={letters[i] + ": " + option.label}
+              aria-label={[
+                letters[i] + ": " + option.label,
+                accessibleResult,
+                picked ? "Your pick" : "",
+              ]
+                .filter(Boolean)
+                .join(". ")}
               aria-pressed={picked}
               onClick={() => answer(option.id)}
             >
@@ -960,49 +1076,47 @@ function Round({ state, role, isHost, answer, hostAction, busy, offset }) {
           role="status"
         >
           <div className="reveal-mark">
-            {opinion
-              ? isAward
-                ? "★"
-                : "↗"
-              : playing
-                ? points > 0
-                  ? "+" + points.toLocaleString()
-                  : selected === null
-                    ? "⌛"
-                    : "↗"
-                : "✳"}
+            {playing && !eligible
+              ? "↗"
+              : opinion
+                ? isAward
+                  ? "★"
+                  : "↗"
+                : playing
+                  ? points > 0
+                    ? "+" + points.toLocaleString()
+                    : selected === null
+                      ? "⌛"
+                      : "↗"
+                  : "✳"}
           </div>
           <div>
             <h2>
-              {opinion
-                ? winners.length === 0
-                  ? "The room went quiet."
-                  : isAward
-                    ? winners.map((o) => o.label.split(" ")[0]).join(" & ") +
-                      (winners.length > 1
-                        ? " share the award."
-                        : " takes the award.")
-                    : winners.length > 1
-                      ? "A split decision!"
-                      : "The room has spoken."
-                : playing
-                  ? points > 0
-                    ? "Annoyingly well played."
-                    : selected === null
-                      ? "Time got away from you."
-                      : opinion
-                        ? "You went your own way."
+              {playing && !eligible
+                ? isFinalRound
+                  ? "You can play in the next game."
+                  : "Your first round is coming up."
+                : opinion
+                  ? winners.length === 0
+                    ? "The room went quiet."
+                    : isAward
+                      ? awardHeading
+                      : winners.length > 1
+                        ? "A split decision!"
+                        : "The room has spoken."
+                  : playing
+                    ? points > 0
+                      ? "Annoyingly well played."
+                      : selected === null
+                        ? "Time got away from you."
                         : "Confidence: legendary. Accuracy: grey pistol."
-                  : opinion
-                    ? winners.length > 1
-                      ? "A split decision!"
-                      : winners.length === 0
-                        ? "The room went quiet."
-                        : round.playerVote
-                          ? winners[0].label + ", the group has notes."
-                          : "The room has spoken."
                     : "The answer is " + winners[0]?.label + "."}
             </h2>
+            {!opinion && playing && (
+              <p className="correct-answer">
+                Correct answer: {winners[0]?.label}.
+              </p>
+            )}
             {isAward && winners.length > 0 && (
               <strong className="award-title">{result.title}</strong>
             )}
@@ -1029,17 +1143,21 @@ function Round({ state, role, isHost, answer, hostAction, busy, offset }) {
         <div className="answer-status" role="status">
           <span className="status-dot" />
           <span>
-            {playing && selected !== null
-              ? opinion
-                ? "Vote locked. Your choice stays secret until the reveal."
-                : "Answer locked. Watch the reveal."
-              : playing
+            {playing && !eligible
+              ? isFinalRound
+                ? "Watch this final round. You can play in the next game."
+                : "Watch this round. Your answer buttons open next round."
+              : playing && selected !== null
                 ? opinion
-                  ? "Tap a name or choice to lock in your vote."
-                  : "Tap once to lock in your answer."
-                : opinion
-                  ? "Vote on your phone. Self-votes are allowed."
-                  : "Choose your answer on your phone."}
+                  ? "Vote locked. Your choice stays secret until the reveal."
+                  : "Answer locked. Watch the reveal."
+                : playing
+                  ? opinion
+                    ? "Tap a name or choice to lock in your vote."
+                    : "Tap once to lock in your answer."
+                  : opinion
+                    ? "Vote on your phone. Self-votes are allowed."
+                    : "Choose your answer on your phone."}
           </span>
           <b>
             {round.answeredCount} / {round.expectedCount} in
@@ -1052,16 +1170,19 @@ function Round({ state, role, isHost, answer, hostAction, busy, offset }) {
         </div>
       )}
       {isHost && (
-        <HostControls state={state} hostAction={hostAction} busy={busy} />
+        <>
+          <HostControls state={state} hostAction={hostAction} busy={busy} />
+          <RoomAction action="end" {...{ hostAction, busy }} />
+        </>
       )}
       {playing && (
         <details className="phone-leaderboard">
           <summary>
-            {state.settings.mode === "trivia"
+            {isScoredMode(state.settings.mode)
               ? "See the scores"
               : "See awards & scores"}
           </summary>
-          {state.settings.mode !== "trivia" ? (
+          {!isScoredMode(state.settings.mode) ? (
             <AwardCabinet
               players={state.players}
               showPoints={state.settings.mode === "mix"}
@@ -1102,8 +1223,17 @@ function Leaderboard({ players, me }) {
 }
 
 function Finished({ state, isHost, hostAction, busy }) {
-  if (state.settings.mode !== "trivia")
-    return <PartyFinished {...{ state, isHost, hostAction, busy }} />;
+  if (!isScoredMode(state.settings.mode))
+    return (
+      <PartyFinished
+        {...{ state, isHost, hostAction, busy }}
+        roomAction={
+          isHost ? (
+            <RoomAction action="close" {...{ hostAction, busy }} />
+          ) : null
+        }
+      />
+    );
   const high = Math.max(...state.players.map((p) => p.score));
   const winners = state.players.filter((p) => p.score === high);
   return (
@@ -1124,7 +1254,9 @@ function Finished({ state, isHost, hostAction, busy }) {
       <p className="muted">
         {high === 0
           ? "The snacks were the real winners."
-          : winners.map((p) => p.name).join(" & ") +
+          : (winners.length > 2
+              ? winners.length + " players share the crown"
+              : winners.map((p) => p.name).join(" & ")) +
             " · " +
             high.toLocaleString() +
             " points"}
@@ -1151,6 +1283,7 @@ function Finished({ state, isHost, hostAction, busy }) {
       <p className="fine-print">
         Same people. Clean scoreboard. New bragging rights.
       </p>
+      {isHost && <RoomAction action="close" {...{ hostAction, busy }} />}
     </section>
   );
 }
@@ -1214,6 +1347,7 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [offset, setOffset] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
+  const roomClosed = /closed|expired|does not exist/i.test(fatal);
   function receive(next) {
     setState(next);
     setOffset(next.serverTime - Date.now());
@@ -1383,16 +1517,23 @@ function App() {
         {fatal ? (
           <section className="entry-wrap">
             <span className="entry-illustration">↗</span>
-            <h1>Let’s get you back in.</h1>
+            <h1>
+              {roomClosed ? "This room is closed." : "Let’s get you back in."}
+            </h1>
             <p>{fatal}</p>
             <div className="recovery-actions">
-              <a className="button primary" href={"/join?room=" + code}>
-                Join the room <Arrow />
+              {!roomClosed && (
+                <a className="button primary" href={"/join?room=" + code}>
+                  Join the room <Arrow />
+                </a>
+              )}
+              <a
+                className={"button " + (roomClosed ? "primary" : "outline")}
+                href="/"
+              >
+                {roomClosed ? "Start a new game" : "Home"}
               </a>
-              <a className="button outline" href="/">
-                Home
-              </a>
-              {role === "host" && (
+              {role === "host" && !roomClosed && (
                 <a className="text-link" href={"/tv/" + code}>
                   Open the TV view
                 </a>

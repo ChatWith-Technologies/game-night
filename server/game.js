@@ -1,9 +1,12 @@
 import { randomInt, randomBytes } from "node:crypto";
 import { trivia, categories, defaultCategories } from "./content.js";
 import { partyAwards, partyPolls } from "./party-content.js";
+import { truthQuestions } from "./truth-content.js";
 
 export const MAX_PLAYERS = 8;
-export const MODES = ["mix", "trivia", "party"];
+export const MODES = ["mix", "trivia", "party", "truefalse"];
+const EMPTY_ROOM_LIFETIME = 10 * 60 * 1000;
+const INACTIVE_ROOM_LIFETIME = 6 * 60 * 60 * 1000;
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
 const token = () => randomBytes(24).toString("hex");
 export function shuffle(items) {
@@ -47,7 +50,23 @@ export function createGameEngine({ now = Date.now, onChange = () => {} } = {}) {
       fail("Please join this room again.")
     );
   }
+  function closeRoom(room, message) {
+    rooms.delete(room.code);
+    onChange({ code: room.code, expired: true, message });
+  }
+  function pruneRooms() {
+    for (const room of rooms.values()) {
+      if (
+        (room.emptySince !== null &&
+          now() - room.emptySince >= EMPTY_ROOM_LIFETIME) ||
+        now() - room.updatedAt >= INACTIVE_ROOM_LIFETIME
+      )
+        closeRoom(room, "This room expired. Create a new game.");
+    }
+  }
   function createRoom() {
+    // Reclaim abandoned rooms even if a create arrives before the timer tick.
+    pruneRooms();
     if (rooms.size >= 30)
       fail("Too many rooms are open. Close an old room first.");
     let code;
@@ -63,6 +82,8 @@ export function createGameEngine({ now = Date.now, onChange = () => {} } = {}) {
       phase: "lobby",
       paused: false,
       players: new Map(),
+      connections: new Set(),
+      emptySince: now(),
       settings: {
         mode: "mix",
         rounds: 10,
@@ -82,8 +103,6 @@ export function createGameEngine({ now = Date.now, onChange = () => {} } = {}) {
   }
   function join(code, rawName, avatar = 0) {
     const room = getRoom(code);
-    if (room.phase !== "lobby")
-      fail("This game has started. Join when the host returns to the lobby.");
     let name =
       typeof rawName === "string" ? rawName.trim().replace(/\s+/g, " ") : "";
     if (!name || name.length > 18 || /[\x00-\x1f\x7f]/.test(name))
@@ -115,6 +134,8 @@ export function createGameEngine({ now = Date.now, onChange = () => {} } = {}) {
     if (role === "host") host(room, secret);
     else if (role === "player") player(room, secret).connections.add(socketId);
     else if (role !== "tv") fail("Choose a player, host, or TV view.");
+    room.connections.add(socketId);
+    room.emptySince = null;
     changed(room);
     return room;
   }
@@ -123,6 +144,9 @@ export function createGameEngine({ now = Date.now, onChange = () => {} } = {}) {
     if (!room) return;
     for (const p of room.players.values())
       if (p.token === secret) p.connections.delete(socketId);
+    room.connections.delete(socketId);
+    if (!room.connections.size && room.emptySince === null)
+      room.emptySince = now();
     changed(room);
   }
   function configure(code, secret, settings) {
@@ -139,7 +163,7 @@ export function createGameEngine({ now = Date.now, onChange = () => {} } = {}) {
       fail("Choose valid game settings.");
     if (
       !Array.isArray(settings.categories) ||
-      !settings.categories.length ||
+      (!settings.categories.length && settings.mode !== "truefalse") ||
       settings.categories.some((c) => !categories.includes(c))
     )
       fail("Choose at least one category.");
@@ -148,7 +172,11 @@ export function createGameEngine({ now = Date.now, onChange = () => {} } = {}) {
       rounds: settings.rounds,
       seconds: settings.seconds,
       autoAdvance: settings.autoAdvance,
-      categories: [...new Set(settings.categories)],
+      categories: [
+        ...new Set(
+          settings.categories.length ? settings.categories : defaultCategories,
+        ),
+      ],
     };
     changed(room);
   }
@@ -161,6 +189,7 @@ export function createGameEngine({ now = Date.now, onChange = () => {} } = {}) {
     }
     room.roundIndex++;
     const content = room.deck[room.roundIndex];
+    room.usedContent.add(content.id);
     const choices = content.playerVote
       ? [...room.players.values()].map((p) => p.name)
       : content.choices;
@@ -204,8 +233,10 @@ export function createGameEngine({ now = Date.now, onChange = () => {} } = {}) {
     }
     const awards = fresh(partyAwards);
     const polls = fresh(partyPolls);
+    const truths = fresh(truthQuestions);
     let voteIndex = 0;
     room.deck = Array.from({ length: room.settings.rounds }, (_, i) => {
+      if (room.settings.mode === "truefalse") return truths.shift();
       const vote =
         room.settings.mode === "party" ||
         (room.settings.mode === "mix" && i % 3 === 2);
@@ -215,7 +246,6 @@ export function createGameEngine({ now = Date.now, onChange = () => {} } = {}) {
     });
     if (room.deck.some((q) => !q))
       fail("There are not enough questions for these settings.");
-    for (const q of room.deck) room.usedContent.add(q.id);
     room.roundIndex = -1;
     for (const p of room.players.values()) {
       p.score = 0;
@@ -284,7 +314,8 @@ export function createGameEngine({ now = Date.now, onChange = () => {} } = {}) {
     }
     if (roundId !== room.round.id)
       fail("That was the previous question. Try the current one.");
-    if (!room.round.eligible.includes(p.id)) fail("Wait for the next game.");
+    if (!room.round.eligible.includes(p.id))
+      fail("You can answer from the next round.");
     if (!room.round.options.some((o) => o.id === choiceId))
       fail("Choose one of the answers on screen.");
     if (room.round.answers.has(p.id)) fail("Your answer is already locked in.");
@@ -295,6 +326,18 @@ export function createGameEngine({ now = Date.now, onChange = () => {} } = {}) {
   function action(code, secret, name) {
     const room = getRoom(code);
     host(room, secret);
+    if (name === "close") return closeRoom(room, "The host closed this room.");
+    if (name === "end") {
+      if (room.phase === "finished") return;
+      if (!["question", "reveal"].includes(room.phase))
+        fail("Start a game before ending it.");
+      // Scores only change on reveal. Discard an open, unscored question.
+      room.phase = "finished";
+      room.paused = false;
+      room.round = null;
+      changed(room);
+      return;
+    }
     if (name === "start") return start(code, secret);
     if (name === "next") {
       if (room.phase !== "reveal")
@@ -335,7 +378,11 @@ export function createGameEngine({ now = Date.now, onChange = () => {} } = {}) {
     if (room.phase !== "lobby")
       fail("Players can only be removed in the lobby.");
     if (!room.players.has(playerId)) fail("That player has already left.");
+    for (const socketId of room.players.get(playerId).connections)
+      room.connections.delete(socketId);
     room.players.delete(playerId);
+    if (!room.connections.size && room.emptySince === null)
+      room.emptySince = now();
     changed(room);
   }
   function view(room, role = "tv", secret = null) {
@@ -366,12 +413,17 @@ export function createGameEngine({ now = Date.now, onChange = () => {} } = {}) {
             score: me.score,
             titles: me.titles,
             answer: round?.answers.get(me.id) ?? null,
+            eligible:
+              room.phase === "lobby" ||
+              (["question", "reveal"].includes(room.phase) &&
+                Boolean(round?.eligible.includes(me.id))),
           }
         : null,
       round: round
         ? {
             id: round.id,
             kind: round.content.kind,
+            format: round.content.format || null,
             category: round.content.category,
             playerVote: Boolean(round.content.playerVote),
             title: round.content.title || null,
@@ -388,12 +440,8 @@ export function createGameEngine({ now = Date.now, onChange = () => {} } = {}) {
     };
   }
   function tick() {
+    pruneRooms();
     for (const room of rooms.values()) {
-      if (now() - room.updatedAt > 6 * 60 * 60 * 1000) {
-        rooms.delete(room.code);
-        onChange({ code: room.code, expired: true });
-        continue;
-      }
       if (room.paused || !room.round || now() < room.round.deadline) continue;
       if (room.phase === "question") reveal(room);
       else if (room.phase === "reveal" && room.settings.autoAdvance)

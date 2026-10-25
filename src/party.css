@@ -49,12 +49,16 @@
   padding-bottom: 10px;
   border-bottom: 1px solid var(--line);
 }
+.award-person-heading > div {
+  min-width: 0;
+}
 .award-person-heading > span {
   font-size: 34px;
 }
 .award-person h3 {
   margin: 0;
   font-size: 20px;
+  overflow-wrap: anywhere;
 }
 .award-person small {
   color: var(--muted);
@@ -120,6 +124,12 @@
   .tv .roast-round .answer-option {
     min-height: 80px;
     padding: 10px 14px;
+  }
+  .tv .roast-round .question-block {
+    padding: 14px 0;
+  }
+  .tv .roast-round .answer-grid {
+    gap: 8px;
   }
   .tv .award-title {
     font-size: 15px;

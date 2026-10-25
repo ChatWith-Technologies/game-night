@@ -3,16 +3,20 @@ import { createServer } from "node:http";
 import { networkInterfaces, hostname } from "node:os";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { Server } from "socket.io";
 import QRCode from "qrcode";
 import { createGameEngine } from "./game.js";
 import { trivia, categories } from "./content.js";
 import { partyAwards, partyPolls } from "./party-content.js";
+import { truthQuestions } from "./truth-content.js";
 import { loadEnvFile } from "node:process";
 import { isIP } from "node:net";
 
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
+const { version } = JSON.parse(
+  readFileSync(path.join(ROOT, "package.json"), "utf8"),
+);
 try {
   loadEnvFile(path.join(ROOT, ".env"));
 } catch (error) {
@@ -24,6 +28,7 @@ if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535)
 const distDirectory = "dist";
 const contentCount = {
   trivia: trivia.length,
+  truefalse: truthQuestions.length,
   awards: partyAwards.length,
   polls: partyPolls.length,
 };
@@ -117,9 +122,11 @@ function broadcast(room) {
     if (socket.data.code !== room.code) continue;
     if (room.expired) {
       socket.emit("room:closed", {
-        message: "This room expired. Create a new game.",
+        message: room.message || "This room expired. Create a new game.",
       });
       socket.data.code = null;
+      socket.data.role = null;
+      socket.data.secret = null;
       continue;
     }
     try {
@@ -227,7 +234,7 @@ app.get("/api/health", (_req, res) =>
   res.json({
     ok: true,
     app: "chatwith-game-night",
-    version: "0.1.0",
+    version,
     port: PORT,
   }),
 );
@@ -279,6 +286,19 @@ if (dev) {
     res.sendFile(path.join(ROOT, distDirectory, "index.html")),
   );
 }
+// Express otherwise exposes stack traces and local paths when NODE_ENV is unset.
+app.use((error, _req, res, next) => {
+  if (res.headersSent) return next(error);
+  const status = error.status >= 400 && error.status < 500 ? error.status : 500;
+  res
+    .status(status)
+    .type("text/plain")
+    .send(
+      status < 500
+        ? "The request could not be read. Check the address and try again."
+        : "The game could not complete this request. Please try again.",
+    );
+});
 const interval = setInterval(() => engine.tick(), 200);
 interval.unref();
 const cleanRates = setInterval(() => {

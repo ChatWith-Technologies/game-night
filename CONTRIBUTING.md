@@ -34,10 +34,23 @@ On Linux, use `python -m playwright install --with-deps chromium webkit`. The te
 - `src/`: phone, host, and TV screens.
 - `server/game.js`: rooms, timers, scoring, and private player state.
 - `server/content.js`, `server/house-content.js`: trivia and topic packs.
+- `server/truth-content.js`: 60 sourced Fact or Fiction statements. Keep each source link and stable ID.
 - `server/party-content.js`: awards and group polls.
 - `server/index.js`: local web server, QR codes, and live connections.
 - `tests/`: engine, network, and browser checks.
 
-Build a release with `npm run check`, `npm run test:browser`, then `npm run package`. The release script uses an explicit file list and does not include local settings, runtime files, or saved rooms.
+## Release checks
+
+Use Python 3.11 or newer as well as Node.js. After the game and browser checks, run:
+
+```sh
+npm run test:package
+npm run package
+python tests/release-smoke.py
+```
+
+`npm run build` must run before packaging. The build produces a manifest of its browser assets. `release-files.json` lists each public source file by name; there are no folder-wide additions. When adding a public file, review it and add its exact path to this list. Keep local settings, logs, audit evidence, saved sessions, and personal screenshots out of the list and out of Git.
+
+The packaging tests use synthetic private files to prove that unlisted files stay out of the ZIP. The release smoke test extracts the ZIP, installs only runtime packages, and starts a separate local server. Neither test needs an existing game or TV. Before publishing, review the Git changes and archive contents, including image pixels and metadata. A file list cannot detect a secret written into an approved source file.
 
 By contributing, you agree that your contribution may be distributed under the project's MIT license.

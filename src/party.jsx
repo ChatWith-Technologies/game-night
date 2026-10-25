@@ -56,12 +56,16 @@ export function AwardCabinet({ players, showPoints = false }) {
   );
 }
 
-export function PartyFinished({ state, isHost, hostAction, busy }) {
+export function PartyFinished({ state, isHost, hostAction, busy, roomAction }) {
   const mixed = state.settings.mode !== "party";
   const high = Math.max(...state.players.map((p) => p.score));
   const leaders = state.players
     .filter((p) => p.score === high)
-    .map((p) => p.name.split(" ")[0]);
+    .map((p) => p.name);
+  const crown =
+    leaders.length > 2
+      ? `${leaders.length} players share the trivia crown`
+      : `Trivia crown: ${leaders.join(" & ")}`;
   return (
     <section className="party-finished">
       <span className="eyebrow">THE RESULTS ARE IN</span>
@@ -69,7 +73,7 @@ export function PartyFinished({ state, isHost, hostAction, busy }) {
       <p className="muted">
         {mixed
           ? high > 0
-            ? `Trivia crown: ${leaders.join(" & ")} · ${high.toLocaleString()} points.`
+            ? `${crown} · ${high.toLocaleString()} points.`
             : "No trivia points this time. The snacks remain undefeated."
           : "These awards reflect tonight’s votes. There were no right or wrong opinions."}
       </p>
@@ -87,6 +91,7 @@ export function PartyFinished({ state, isHost, hostAction, busy }) {
           The host can start another game. New prompts. Fresh allegations.
         </p>
       )}
+      {roomAction}
     </section>
   );
 }

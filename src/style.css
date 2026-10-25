@@ -533,10 +533,13 @@ nav {
 }
 .mode-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 20px;
 }
 .mode-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
   color: var(--paper);
   background: #1c332d;
   text-align: left;
@@ -578,6 +581,9 @@ nav {
 .mode-card.lavender .mode-icon {
   background: var(--lavender);
 }
+.mode-card.sky .mode-icon {
+  background: #abdcdf;
+}
 .mode-number {
   font-size: 11px;
   color: #a3b4a6;
@@ -599,6 +605,7 @@ nav {
   margin-bottom: 24px;
 }
 .mode-bottom {
+  margin-top: auto;
   border-top: 1px solid #3e5145;
   padding-top: 18px;
   display: flex;
@@ -981,7 +988,8 @@ footer > span:last-child {
   margin-bottom: 10px;
 }
 .mode-switch {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   border: 1px solid #4e6750;
   padding: 5px;
   gap: 5px;
@@ -1514,6 +1522,64 @@ footer > span:last-child {
   font-size: 12px;
   padding: 11px 16px;
 }
+.room-action {
+  max-width: 780px;
+  margin: 18px auto 0;
+  text-align: left;
+}
+.room-action-trigger {
+  color: var(--muted);
+  min-height: 44px;
+  padding: 10px 16px;
+  font-size: 12px;
+}
+.room-confirmation {
+  border: 1px solid #b47e60;
+  border-radius: 10px;
+  background: #332f25;
+  padding: 20px;
+}
+.room-confirmation h3 {
+  font-size: 20px;
+  margin-bottom: 9px;
+}
+.room-confirmation p {
+  color: var(--muted);
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+.confirmation-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.confirmation-buttons .button {
+  min-height: 44px;
+  font-size: 13px;
+}
+.button.danger {
+  background: var(--orange);
+  color: var(--ink);
+}
+.late-join-banner {
+  background: #293e43;
+  border: 1px solid #729fa1;
+  border-radius: 9px;
+  color: var(--paper);
+  padding: 14px 18px;
+  margin-top: 20px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.reveal-card .correct-answer {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.answer-result {
+  display: block;
+  font-size: 12px;
+  line-height: 1.4;
+}
 .pause-banner {
   padding: 14px 20px;
   background: var(--orange);
@@ -1769,6 +1835,9 @@ footer > span:last-child {
   }
 }
 @media (max-width: 1100px) {
+  .mode-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .app {
     padding: 0 34px;
   }
