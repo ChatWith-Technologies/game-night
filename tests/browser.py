@@ -385,14 +385,15 @@ def play_features(browser, base, label, errors, outside):
         tv.screenshot(path=str(OUT / f"{label}-tv-eight-long-names-awards.png"), animations="disabled")
 
         # Closing is explicit, can be canceled, and invalidates every room view.
-        host.get_by_role("button", name="Close room", exact=True).click()
-        confirmation = host.get_by_role("group", name="Close room confirmation")
-        expect(confirmation).to_be_visible()
-        expect(host.get_by_role("button", name="Keep room open", exact=True)).to_be_focused()
-        host.get_by_role("button", name="Keep room open", exact=True).click()
-        expect(confirmation).to_have_count(0)
-        expect(host.get_by_role("button", name="Close room", exact=True)).to_be_focused()
-        expect(tv.locator(".award-person")).to_have_count(8)
+        for _ in range(3):
+            host.get_by_role("button", name="Close room", exact=True).click()
+            confirmation = host.get_by_role("group", name="Close room confirmation")
+            expect(confirmation).to_be_visible()
+            expect(host.get_by_role("button", name="Keep room open", exact=True)).to_be_focused()
+            host.get_by_role("button", name="Keep room open", exact=True).click()
+            expect(confirmation).to_have_count(0)
+            expect(host.get_by_role("button", name="Close room", exact=True)).to_be_focused()
+            expect(tv.locator(".award-person")).to_have_count(8)
         host.get_by_role("button", name="Close room", exact=True).click()
         host.get_by_role("button", name="Close room now", exact=True).click()
         for page in [*phones, tv]:
@@ -444,8 +445,40 @@ def play_features(browser, base, label, errors, outside):
                 "late_joiners_wait_then_play": 6, "late_join_reload": True,
                 "last_round_join_and_rematch": True,
                 "end_confirmation_and_score_retention": True, "close_confirmation_and_room_removal": True,
+                "close_confirmation_cancel_reopen_cycles": 3,
                 "accessible_results_and_round_announcements": True,
                 "long_names_at_720p": LONG_NAMES, "eight_way_award_tie": True}
+    except Exception:
+        # Save only the generated test screens and layout, never browser storage.
+        for name in ("host", "tv"):
+            page = locals().get(name)
+            if page is None or page.is_closed():
+                continue
+            try:
+                samples = []
+                for _ in range(10):
+                    samples.append(page.evaluate("""() => ({
+                        scrollY, height: innerHeight,
+                        scrollHeight: document.documentElement.scrollHeight,
+                        activeElement: document.activeElement?.textContent,
+                        buttons: [...document.querySelectorAll('.room-confirmation button')].map(button => {
+                            const box = button.getBoundingClientRect();
+                            return {text: button.textContent, x: box.x, y: box.y,
+                                    width: box.width, height: box.height,
+                                    transform: getComputedStyle(button).transform,
+                                    animations: button.getAnimations().map(animation => ({
+                                        playState: animation.playState,
+                                        currentTime: animation.currentTime,
+                                        keyframes: animation.effect.getKeyframes()
+                                    }))};
+                        })
+                    })"""))
+                    page.wait_for_timeout(100)
+                (OUT / f"{label}-{name}-failure-layout.json").write_text(json.dumps(samples, indent=2), encoding="utf-8")
+                page.screenshot(path=str(OUT / f"{label}-{name}-failure.png"), full_page=True, animations="disabled")
+            except Exception:
+                pass  # Keep the original test failure when a browser has closed.
+        raise
     finally:
         for context in contexts:
             context.close()
